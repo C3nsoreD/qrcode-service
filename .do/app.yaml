@@ -1,0 +1,6 @@
+name: qrcode-service
+service:
+  - name: web
+  github: c3nsored/qrcode-service
+  branch: main
+  
