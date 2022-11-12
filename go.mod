@@ -3,11 +3,6 @@ module github.com/c3nsored/qrcode-service
 go 1.19
 
 require (
-	github.com/dgraph-io/badger/v3 v3.2103.3
-	golang.org/x/mod v0.3.0
-)
-
-require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/dgraph-io/ristretto v0.1.1 // indirect

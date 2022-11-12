@@ -1,10 +1,10 @@
 package store
 
 import (
-	badger "github.com/dgraph-io/badger/v3"
-	
+	badger "github.com/dgraph-io/badger/v3"	
 	"context"
 	"github.com/c3nsored/qrcode-service/pkg/model"
+
 )
 
 type store struct {

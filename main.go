@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	badger "github.com/dgraph-io/badger/v3"
 	"log"
 	"net/http"
 	"os"
@@ -71,4 +72,3 @@ func (a *application) GetEnv() string {
 func (a *application) GetVersion() string {
 	return Version
 }
-
