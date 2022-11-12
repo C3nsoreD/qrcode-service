@@ -1,18 +1,30 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	badger "github.com/dgraph-io/badger/v3"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/c3nsored/qrcode-service/config"
+	"github.com/c3nsored/qrcode-service/pkg/api"
+	"github.com/c3nsored/qrcode-service/pkg/service"
+	"github.com/c3nsored/qrcode-service/pkg/store"
+	badger "github.com/dgraph-io/badger/v3"
 )
 
+const Version = "1.0.0"
+
+type application struct {
+	Config config.Config
+	logger *log.Logger
+}
+
 func main() {
-	cfg := config.Config{
-		Port: ":8080",
-	}
+	var cfg config.Config
 
 	// initialized database
 	db, err := badger.Open(badger.DefaultOptions("/tmp/Badger"))
@@ -21,20 +33,42 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := initServer(cfg); err != nil {
-		fmt.Printf("Failed to initialize server: %v", err)
+
+	flag.IntVar(&cfg.Port, "port", 4000, "API server port")
+	flag.StringVar(&cfg.Env, "env", "development", "Environment (development|stage|production)")
+	flag.Parse()
+
+	logger := log.New(os.Stdout, "", log.Ldate | log.Ltime)
+	
+	app := application{
+		Config: cfg,
+		logger: logger,
 	}
+	dbStore := store.New(db)
+	svc := service.New(dbStore)
+	server := api.New(&app, svc)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/healthcheck", server.HealthCheckHandler)
+
+	srv := &http.Server{
+		Addr: fmt.Sprintf(":%d", cfg.Port),
+		Handler: mux,
+		IdleTimeout: time.Minute,
+		ReadTimeout: 10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+
+	logger.Printf("starting %s server on %s", cfg.Env, srv.Addr)
+	err = srv.ListenAndServe()
+	logger.Fatal(err)
+	
 }
 
-func initServer(cfg config.Config) error {
-	log.Printf("Starting qrcode-server on %s...", cfg.Port)
-
-	if err := http.ListenAndServe(cfg.Port, nil); err != nil {
-		return err
-	}
-	return nil
+func (a *application) GetEnv() string {
+	return a.Config.Env
 }
 
-func mustInitDatabase(cfg config.Config) {
-
+func (a *application) GetVersion() string {
+	return Version
 }
