@@ -1,6 +1,6 @@
 package service
 
-type Service struct {
+type Server struct {
 	db QRCodeStore
 }
 
