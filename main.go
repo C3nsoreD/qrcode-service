@@ -6,11 +6,17 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/c3nsored/qrcode-service/config"
+	"github.com/c3nsored/qrcode-service/service"
 )
 
+type Config struct {
+	Port string
+}
+
+
+
 func main() {
-	cfg := config.Config{
+	cfg := Config{
 		Port: ":8080",
 	}
 
@@ -21,20 +27,31 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := initServer(cfg); err != nil {
+	store := service.NewStore(db)
+
+	srv := service.NewService(store)
+
+	// actions channel
+	actionCh := make(chan service.Action)
+	qrCodes := make(map[string]service.QRCode)
+
+	go srv.StartServiceManager(qrCodes, actionCh)
+	api := MakeHandlers(service.SeviceHandler, "api/qrcode/", actionCh)
+
+	if err := initServer(cfg, api); err != nil {
 		fmt.Printf("Failed to initialize server: %v", err)
 	}
 }
 
-func initServer(cfg config.Config) error {
+func initServer(cfg Config, handlers http.HandlerFunc) error {
 	log.Printf("Starting qrcode-server on %s...", cfg.Port)
 
-	if err := http.ListenAndServe(cfg.Port, nil); err != nil {
+	if err := http.ListenAndServe(cfg.Port, handlers); err != nil {
 		return err
 	}
 	return nil
 }
 
-func mustInitDatabase(cfg config.Config) {
+func mustInitDatabase(cfg Config) {
 
 }

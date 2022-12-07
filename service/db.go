@@ -1,35 +1,49 @@
 package service
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 
-	"github.com/c3nsored/qrcode-service/pkg/model"
 	badger "github.com/dgraph-io/badger/v3"
 	"github.com/skip2/go-qrcode"
 )
+
+type QRCode struct {
+	Id   string
+	SiteId string
+	Data []byte 
+}
 
 const (
 	QrCodeSize = 256
 	QrCodeLevel = qrcode.Medium
 )
 
-type store struct {
+type Store struct {
 	db *badger.DB
 }
 
-func New(db *badger.DB) *store {
-	return &store{
+func NewStore(db *badger.DB) *Store {
+	return &Store{
 		db: db,
 	}
 }
 
 
+func (s *Store) CreateQrCode(api map[string]QRCode, act <- chan Action) {
+	// act.RetChan <- response{
+	// 	StatusCode: http.StatusCreated,
+	// } 
+	fmt.Println("Created QRCode")
+}
 
-
-func (s *store) CreateQrCode(ctx context.Context, data model.QRCode)
-
-
-func (s *Server) GetQRCode(ctx context.Context, id string) (model.QrCode, error)
+func (s *Store) GetQrCode(api map[string]QRCode, act <- chan Action) {
+	// act.RetChan <- response{
+	// 	StatusCode: http.StatusOK,
+	// }
+	fmt.Println("Getting QRCode")
+}
 
 
 func encodeQrCode(content string) ([]byte, error) {
