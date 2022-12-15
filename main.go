@@ -1,10 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	badger "github.com/dgraph-io/badger/v3"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/c3nsored/qrcode-service/service"
 )
@@ -39,7 +42,10 @@ func main() {
 	if err := initServer(cfg, api); err != nil {
 		fmt.Printf("Failed to initialize server: %v", err)
 	}
-}
+	dbStore := store.New(db)
+	svc := service.New(dbStore)
+	server := api.New(&app, svc)
+
 
 func initServer(cfg Config, handlers http.HandlerFunc) error {
 	log.Printf("Starting qrcode-server on %s...", cfg.Port)
@@ -47,12 +53,12 @@ func initServer(cfg Config, handlers http.HandlerFunc) error {
 	if err := http.ListenAndServe(cfg.Port, handlers); err != nil {
 		return err
 	}
-	return nil
+
+	logger.Printf("starting %s server on %s", cfg.Env, srv.Addr)
+	err = srv.ListenAndServe()
+	logger.Fatal(err)
+	
 }
-
-// func mustInitDatabase(cfg Config) {
-
-// }
 
 func MakeHandlers(
 	fn func(http.ResponseWriter, *http.Request, string, string, chan<- service.Action),
@@ -67,4 +73,5 @@ func MakeHandlers(
 		id := path[len(endpoint):]
 		fn(w, r, id, method, actionCh)
 	}
+
 }
