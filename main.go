@@ -9,22 +9,17 @@ import (
 	"os"
 	"time"
 
-	"github.com/c3nsored/qrcode-service/config"
-	"github.com/c3nsored/qrcode-service/pkg/api"
-	"github.com/c3nsored/qrcode-service/pkg/service"
-	"github.com/c3nsored/qrcode-service/pkg/store"
-	badger "github.com/dgraph-io/badger/v3"
+	"github.com/c3nsored/qrcode-service/service"
 )
 
-const Version = "1.0.0"
-
-type application struct {
-	Config config.Config
-	logger *log.Logger
+type Config struct {
+	Port string
 }
 
 func main() {
-	var cfg config.Config
+	cfg := Config{
+		Port: ":8080",
+	}
 
 	// initialized database
 	db, err := badger.Open(badger.DefaultOptions("/tmp/Badger"))
@@ -33,30 +28,30 @@ func main() {
 	}
 	defer db.Close()
 
+	store := service.NewStore(db)
 
-	flag.IntVar(&cfg.Port, "port", 4000, "API server port")
-	flag.StringVar(&cfg.Env, "env", "development", "Environment (development|stage|production)")
-	flag.Parse()
+	srv := service.NewService(store)
 
-	logger := log.New(os.Stdout, "", log.Ldate | log.Ltime)
-	
-	app := application{
-		Config: cfg,
-		logger: logger,
+	// actions channel
+	actionCh := make(chan service.Action)
+	qrCodes := make(map[string]service.QRCode)
+
+	go srv.StartServiceManager(qrCodes, actionCh)
+	api := MakeHandlers(service.SeviceHandler, "api/qrcode/", actionCh)
+
+	if err := initServer(cfg, api); err != nil {
+		fmt.Printf("Failed to initialize server: %v", err)
 	}
 	dbStore := store.New(db)
 	svc := service.New(dbStore)
 	server := api.New(&app, svc)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/healthcheck", server.HealthCheckHandler)
 
-	srv := &http.Server{
-		Addr: fmt.Sprintf(":%d", cfg.Port),
-		Handler: mux,
-		IdleTimeout: time.Minute,
-		ReadTimeout: 10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+func initServer(cfg Config, handlers http.HandlerFunc) error {
+	log.Printf("Starting qrcode-server on %s...", cfg.Port)
+
+	if err := http.ListenAndServe(cfg.Port, handlers); err != nil {
+		return err
 	}
 
 	logger.Printf("starting %s server on %s", cfg.Env, srv.Addr)
@@ -65,10 +60,18 @@ func main() {
 	
 }
 
-func (a *application) GetEnv() string {
-	return a.Config.Env
-}
+func MakeHandlers(
+	fn func(http.ResponseWriter, *http.Request, string, string, chan<- service.Action),
+	endpoint string,
+	actionCh chan<- service.Action,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		method := r.Method
 
-func (a *application) GetVersion() string {
-	return Version
+		log.Println(fmt.Sprintf("Recieved request [%s] for path: [%s]", method, path))
+		id := path[len(endpoint):]
+		fn(w, r, id, method, actionCh)
+	}
+
 }
