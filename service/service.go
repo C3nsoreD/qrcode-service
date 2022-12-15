@@ -1,8 +1,8 @@
 package service
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -12,12 +12,12 @@ import (
 type Server struct {
 	repository qrCodeStore
 }
+
 // QRCodeStore implements API calls to kv store
 type qrCodeStore interface {
-	GetQrCode(api map[string]QRCode, act <- chan Action)
-	CreateQrCode(api map[string]QRCode, act <- chan Action)
+	GetQrCode(api map[string]QRCode, act Action)
+	CreateQrCode(api map[string]QRCode, act Action)
 }
-
 
 func NewService(repo qrCodeStore) *Server {
 	return &Server{
@@ -26,46 +26,45 @@ func NewService(repo qrCodeStore) *Server {
 }
 
 type reqPayload struct {
-	id string
-	site_id string
+	id       string
+	site_id  string
 	resource string
 }
 
-type response struct {
+type Response struct {
 	StatusCode int
-	QrCodes []byte
+	QrCodes    string
 }
 
 type Action struct {
-	Id string
-	Type string
+	Id      string
+	Type    string
 	Payload reqPayload
-	RetChan chan<- response 
+	RetChan chan<- Response
 }
 
-
-func (s *Server) StartServiceManager(api map[string]QRCode, action <- chan Action) {
+func (s *Server) StartServiceManager(api map[string]QRCode, action <-chan Action) {
 	for {
 		select {
 		case act := <-action:
 			switch act.Type {
 			case "GET":
-				s.repository.GetQrCode(api, action)
+				s.repository.GetQrCode(api, act)
 			case "POST":
-				id, _ := uuid.NewUUID() // TODO: 
+				id, _ := uuid.NewUUID() // TODO:
 				fmt.Println(id)
-				s.repository.CreateQrCode(api, action)
+				s.repository.CreateQrCode(api, act)
 			}
 		}
 	}
 }
 
-
-func SeviceHandler(w http.ResponseWriter, r *http.Request, method string, action chan<- Action) {
-	resp := make(chan response)
+func SeviceHandler(w http.ResponseWriter, r *http.Request, id, method string, action chan<- Action) {
+	respCh := make(chan Response)
 	act := Action{
-		Type: method,
-		RetChan: resp,
+		Id:      id,
+		Type:    method,
+		RetChan: respCh,
 	}
 
 	if method == "POST" {
@@ -73,11 +72,49 @@ func SeviceHandler(w http.ResponseWriter, r *http.Request, method string, action
 		body, _ := ioutil.ReadAll(r.Body)
 		defer r.Body.Close()
 
-		if err := json.Unmarshal(body, payload); err != nil {
+		if err := json.Unmarshal(body, &payload); err != nil {
 			fmt.Println("Error on POST request")
 			return
 		}
 
 		act.Payload = payload
+	}
+	action <- act
+	var resp Response
+	if resp = <-respCh; resp.StatusCode > http.StatusCreated {
+		writeError(w, resp.StatusCode)
+		return
+	}
+
+	writeResponse(w, resp)
+}
+
+func writeResponse(w http.ResponseWriter, resp Response) {
+	serializedPayload, err := json.Marshal(resp.QrCodes)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError)
+		fmt.Println("Error while serializing payload:", err)
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		w.Write(serializedPayload)
+	}
+}
+
+func writeError(w http.ResponseWriter, statusCode int) {
+	jsonMsg := struct {
+		Msg  string `json:"msg"`
+		Code int    `json:"code"`
+	}{
+		Code: statusCode,
+		Msg:  http.StatusText(statusCode),
+	}
+	if serializedPayload, err := json.Marshal(jsonMsg); err != nil {
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		fmt.Println("Error while serializing paylaod:", err)
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+		w.Write(serializedPayload)
 	}
 }

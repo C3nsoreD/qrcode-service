@@ -13,8 +13,6 @@ type Config struct {
 	Port string
 }
 
-
-
 func main() {
 	cfg := Config{
 		Port: ":8080",
@@ -52,6 +50,21 @@ func initServer(cfg Config, handlers http.HandlerFunc) error {
 	return nil
 }
 
-func mustInitDatabase(cfg Config) {
+// func mustInitDatabase(cfg Config) {
 
+// }
+
+func MakeHandlers(
+	fn func(http.ResponseWriter, *http.Request, string, string, chan<- service.Action),
+	endpoint string,
+	actionCh chan<- service.Action,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		method := r.Method
+
+		log.Println(fmt.Sprintf("Recieved request [%s] for path: [%s]", method, path))
+		id := path[len(endpoint):]
+		fn(w, r, id, method, actionCh)
+	}
 }

@@ -1,7 +1,7 @@
 package service
 
 import (
-	"context"
+	// "context"
 	"fmt"
 	"net/http"
 
@@ -10,13 +10,13 @@ import (
 )
 
 type QRCode struct {
-	Id   string
+	Id     string
 	SiteId string
-	Data []byte 
+	Data   []byte
 }
 
 const (
-	QrCodeSize = 256
+	QrCodeSize  = 256
 	QrCodeLevel = qrcode.Medium
 )
 
@@ -30,21 +30,19 @@ func NewStore(db *badger.DB) *Store {
 	}
 }
 
-
-func (s *Store) CreateQrCode(api map[string]QRCode, act <- chan Action) {
+func (s *Store) CreateQrCode(api map[string]QRCode, act Action) {
 	// act.RetChan <- response{
 	// 	StatusCode: http.StatusCreated,
-	// } 
+	// }
 	fmt.Println("Created QRCode")
 }
 
-func (s *Store) GetQrCode(api map[string]QRCode, act <- chan Action) {
-	// act.RetChan <- response{
-	// 	StatusCode: http.StatusOK,
-	// }
-	fmt.Println("Getting QRCode")
+func (s *Store) GetQrCode(api map[string]QRCode, act Action) {
+	act.RetChan <- Response{
+		StatusCode: http.StatusOK,
+		QrCodes:    fmt.Sprintf("QrCodeUrl %s", act.Id),
+	}
 }
-
 
 func encodeQrCode(content string) ([]byte, error) {
 	fmt.Println("generating qrcode image...")
