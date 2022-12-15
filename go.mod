@@ -4,7 +4,7 @@ go 1.19
 
 require github.com/dgraph-io/badger/v3 v3.2103.3
 
-require github.com/google/uuid v1.3.0 // indirect
+require github.com/google/uuid v1.3.0
 
 require (
 	github.com/cespare/xxhash v1.1.0 // indirect
