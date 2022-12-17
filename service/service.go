@@ -1,12 +1,14 @@
 package service
 
 import (
+	// "bytes"
 	"encoding/json"
 	"fmt"
+	// "io"
 	"io/ioutil"
+	// "mime/multipart"
 	"net/http"
-
-	"github.com/google/uuid"
+	"strconv"
 )
 
 type Server struct {
@@ -26,14 +28,14 @@ func NewService(repo qrCodeStore) *Server {
 }
 
 type reqPayload struct {
-	id       string
-	site_id  string
-	resource string
+	Id       string `json:"id,omitempty"`
+	SiteId   string `json:"site_id,omitempty"`
+	Resource string `json:"resource,omitempty"`
 }
 
 type Response struct {
 	StatusCode int
-	QrCodes    string
+	QrData     []byte
 }
 
 type Action struct {
@@ -51,8 +53,8 @@ func (s *Server) StartServiceManager(api map[string]QRCode, action <-chan Action
 			case "GET":
 				s.repository.GetQrCode(api, act)
 			case "POST":
-				id, _ := uuid.NewUUID() // TODO:
-				fmt.Println(id)
+				// id, _ := uuid.NewUUID() // TODO:
+				// fmt.Println(id)
 				s.repository.CreateQrCode(api, act)
 			}
 		}
@@ -90,14 +92,15 @@ func SeviceHandler(w http.ResponseWriter, r *http.Request, id, method string, ac
 }
 
 func writeResponse(w http.ResponseWriter, resp Response) {
-	serializedPayload, err := json.Marshal(resp.QrCodes)
+	_, err := json.Marshal(resp.QrData)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError)
 		fmt.Println("Error while serializing payload:", err)
 	} else {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Content-Length", strconv.Itoa(len(resp.QrData)))
 		w.WriteHeader(resp.StatusCode)
-		w.Write(serializedPayload)
+		w.Write(resp.QrData)
 	}
 }
 
