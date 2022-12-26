@@ -1,24 +1,20 @@
 package main
 
 import (
-	// "flag"
-	"fmt"
 	badger "github.com/dgraph-io/badger/v3"
 	"log"
 	"net/http"
-	// "os"
-	// "time"
 
 	"github.com/c3nsored/qrcode-service/service"
 )
 
 type Config struct {
-	Port string
+	Addr string
 }
 
 func main() {
 	cfg := Config{
-		Port: ":8080",
+		Addr: "127.0.0.1:8080",
 	}
 	qrCodesData := make(map[string][]byte)
 
@@ -33,26 +29,26 @@ func main() {
 
 	srv := service.NewService(store)
 
-	// actions channel
-	actionCh := make(chan service.Action)
-	qrCodes := make(map[string]service.QRCode)
+	actionCh := make(chan service.Action)      // actions channel
+	qrCodes := make(map[string]service.QRCode) // used to mock data storage.
 
-	go srv.StartServiceManager(qrCodes, actionCh)
+	go srv.ServiceManager(qrCodes, actionCh)
 	api := MakeHandlers(service.SeviceHandler, "/api/qrcode/", actionCh)
 
 	if err := initServer(cfg, api); err != nil {
-		fmt.Printf("Failed to initialize server: %v", err)
+		log.Fatalf("Failed to start server: %v", err)
 	}
 }
 
 func initServer(cfg Config, handlers http.HandlerFunc) error {
-	log.Printf("Starting qrcode-server on %s...", cfg.Port)
+	log.Printf("Starting qrcode-server on %s...", cfg.Addr)
 
-	if err := http.ListenAndServe(cfg.Port, handlers); err != nil {
-		return err
+	server := http.Server{
+		Addr:    cfg.Addr,
+		Handler: handlers,
 	}
 
-	return nil
+	return server.ListenAndServe()
 }
 
 func MakeHandlers(
@@ -64,7 +60,7 @@ func MakeHandlers(
 		path := r.URL.Path
 		method := r.Method
 
-		log.Println(fmt.Sprintf("Recieved request [%s] for path: [%s]", method, path))
+		log.Printf("Recieved request [%s] for path: [%s]", method, path)
 		id := path[len(endpoint):]
 
 		fn(w, r, id, method, actionCh)
