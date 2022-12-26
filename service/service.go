@@ -1,12 +1,9 @@
 package service
 
 import (
-	// "bytes"
 	"encoding/json"
 	"fmt"
-	// "io"
 	"io/ioutil"
-	// "mime/multipart"
 	"net/http"
 	"strconv"
 )
@@ -45,7 +42,7 @@ type Action struct {
 	RetChan chan<- Response
 }
 
-func (s *Server) StartServiceManager(api map[string]QRCode, action <-chan Action) {
+func (s *Server) ServiceManager(api map[string]QRCode, action <-chan Action) {
 	for {
 		select {
 		case act := <-action:
@@ -53,8 +50,6 @@ func (s *Server) StartServiceManager(api map[string]QRCode, action <-chan Action
 			case "GET":
 				s.repository.GetQrCode(api, act)
 			case "POST":
-				// id, _ := uuid.NewUUID() // TODO:
-				// fmt.Println(id)
 				s.repository.CreateQrCode(api, act)
 			}
 		}

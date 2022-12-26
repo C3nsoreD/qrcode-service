@@ -33,9 +33,9 @@ func main() {
 	qrCodes := make(map[string]service.QRCode) // used to mock data storage.
 
 	go srv.ServiceManager(qrCodes, actionCh)
-	api := MakeHandlers(service.SeviceHandler, "/api/qrcode/", actionCh)
+	qrCodeHandlers := MakeHandlers(service.SeviceHandler, "/api/qrcode/", actionCh)
 
-	if err := initServer(cfg, api); err != nil {
+	if err := initServer(cfg, qrCodeHandlers); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
