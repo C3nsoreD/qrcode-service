@@ -12,6 +12,8 @@ type Config struct {
 	Addr string
 }
 
+const localStore = ".store"
+
 func main() {
 	cfg := Config{
 		Addr: "127.0.0.1:8080",
@@ -51,6 +53,7 @@ func initServer(cfg Config, handlers http.HandlerFunc) error {
 	return server.ListenAndServe()
 }
 
+// Creates a generic handler for qr-code server
 func MakeHandlers(
 	fn func(http.ResponseWriter, *http.Request, string, string, chan<- service.Action),
 	endpoint string,
