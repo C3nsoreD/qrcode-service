@@ -1,74 +1,48 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	badger "github.com/dgraph-io/badger/v3"
 	"log"
 	"net/http"
-	"os"
-	"time"
 
-	"github.com/c3nsored/qrcode-service/config"
-	"github.com/c3nsored/qrcode-service/pkg/api"
-	"github.com/c3nsored/qrcode-service/pkg/service"
-	"github.com/c3nsored/qrcode-service/pkg/store"
-	badger "github.com/dgraph-io/badger/v3"
+	"github.com/c3nsored/qrcode-service/service"
 )
 
-const Version = "1.0.0"
-
-type application struct {
-	Config config.Config
-	logger *log.Logger
+type Config struct {
+	Addr string
 }
 
-func main() {
-	var cfg config.Config
+const localStore = ".store"
 
-	// initialized database
+func main() {
+	cfg := Config{
+		Addr: "127.0.0.1:8080",
+	}
+	qrCodesData := make(map[string][]byte)
+
+	// initialized kv data store
 	db, err := badger.Open(badger.DefaultOptions("/tmp/Badger"))
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
+	store := service.NewStore(db, qrCodesData)
 
-	flag.IntVar(&cfg.Port, "port", 4000, "API server port")
-	flag.StringVar(&cfg.Env, "env", "development", "Environment (development|stage|production)")
-	flag.Parse()
+	srv := service.NewService(store)
 
-	logger := log.New(os.Stdout, "", log.Ldate | log.Ltime)
-	
-	app := application{
-		Config: cfg,
-		logger: logger,
+	if err := initServer(cfg, srv); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
 	}
-	dbStore := store.New(db)
-	svc := service.New(dbStore)
-	server := api.New(&app, svc)
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/healthcheck", server.HealthCheckHandler)
-
-	srv := &http.Server{
-		Addr: fmt.Sprintf(":%d", cfg.Port),
-		Handler: mux,
-		IdleTimeout: time.Minute,
-		ReadTimeout: 10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-	}
-
-	logger.Printf("starting %s server on %s", cfg.Env, srv.Addr)
-	err = srv.ListenAndServe()
-	logger.Fatal(err)
-	
 }
 
-func (a *application) GetEnv() string {
-	return a.Config.Env
-}
+func initServer(cfg Config, handlers http.Handler) error {
+	log.Printf("Starting qrcode-server on %s...", cfg.Addr)
 
-func (a *application) GetVersion() string {
-	return Version
+	server := http.Server{
+		Addr:    cfg.Addr,
+		Handler: handlers,
+	}
+
+	return server.ListenAndServe()
 }
