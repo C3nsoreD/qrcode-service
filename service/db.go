@@ -1,7 +1,6 @@
 package service
 
 import (
-	// "fmt"
 	"log"
 	"net/http"
 
@@ -32,50 +31,52 @@ func NewStore(db *badger.DB, data map[string][]byte) *Store {
 	}
 }
 
-func (s *Store) CreateQrCode(api map[string]QRCode, act Action) {
-	qr, err := GenerateQrCode(act.Payload.Resource)
+func (s *Store) CreateQrCode(payload string) (*Response, error) {
+	qr, err := GenerateQrCode(payload)
 	if err != nil {
-		logErr(act, err)
+		return nil, err
 	}
 
 	png, err := qr.Code.PNG(250)
 	if err != nil {
-		logErr(act, err)
+		return nil, err
 	}
 
 	if err = s.storeResource(qr.Id, png); err != nil {
 		log.Println("failed to store new qr-code", err)
-		act.RetChan <- Response{
+		return &Response{
 			StatusCode: http.StatusInternalServerError,
-			QrData:     nil,
-		}
+			Data:       nil,
+		}, nil
 	}
 
-	act.RetChan <- Response{
+	return &Response{
 		StatusCode: http.StatusCreated,
-	}
+	}, nil
 }
 
-func (s *Store) GetQrCode(api map[string]QRCode, act Action) {
-	log.Printf("retrieving qr-code with id: %s\n", act.Id)
-
+func (s *Store) GetQrCode(id string) (*Response, error) {
+	log.Printf("retrieving qr-code with id: %s\n", id)
+	var res *Response
 	if err := s.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte(act.Id))
+		item, err := txn.Get([]byte(id))
 		if err != nil {
 			return err
 		}
-		val, _ := item.ValueCopy(nil)
-		act.RetChan <- Response{
+		val, err := item.ValueCopy(nil)
+
+		res = &Response{
 			StatusCode: http.StatusOK,
-			QrData:     val,
+			Data:       val,
 		}
 		return nil
 	}); err != nil {
-		act.RetChan <- Response{
+		return &Response{
 			StatusCode: http.StatusInternalServerError,
-			QrData:     nil,
-		}
+			Data:       nil,
+		}, nil
 	}
+	return res, nil
 }
 
 func (s *Store) storeResource(key string, value []byte) error {
@@ -89,10 +90,10 @@ func (s *Store) storeResource(key string, value []byte) error {
 	return txn.Commit()
 }
 
-func logErr(act Action, err error) {
+func logErr(err error) *Response {
 	log.Println("failed to genereate qr-code", err)
-	act.RetChan <- Response{
+	return &Response{
 		StatusCode: http.StatusInternalServerError,
-		QrData:     nil,
+		Data:       nil,
 	}
 }
