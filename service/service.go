@@ -6,100 +6,91 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type Server struct {
-	repository qrCodeStore
+	Repo qrCodeStore
 }
 
 // QRCodeStore implements API calls to kv store
 type qrCodeStore interface {
-	GetQrCode(api map[string]QRCode, act Action)
-	CreateQrCode(api map[string]QRCode, act Action)
+	GetQrCode(id string) (*Response, error)
+	CreateQrCode(payload string) (*Response, error)
 }
 
 func NewService(repo qrCodeStore) *Server {
 	return &Server{
-		repository: repo,
+		Repo: repo,
 	}
 }
 
-type reqPayload struct {
-	Id       string `json:"id,omitempty"`
-	SiteId   string `json:"site_id,omitempty"`
-	Resource string `json:"resource,omitempty"`
+// reqPayload contains basic params expected in a request
+type rPayload struct {
+	Id   string `json:"id,omitempty"`
+	Text string `json:"text,omitempty"`
 }
 
+// Response
 type Response struct {
 	StatusCode int
-	QrData     []byte
+	Message    string // detailed information about the reponse.
+	Data       []byte
 }
 
 type Action struct {
 	Id      string
 	Type    string
-	Payload reqPayload
+	Payload rPayload
 	RetChan chan<- Response
 }
 
-func (s *Server) ServiceManager(api map[string]QRCode, action <-chan Action) {
-	for {
-		select {
-		case act := <-action:
-			switch act.Type {
-			case "GET":
-				s.repository.GetQrCode(api, act)
-			case "POST":
-				s.repository.CreateQrCode(api, act)
-			}
-		}
+func extractId(path string) (string, error) {
+	if len(path) < 2 {
+		return "", fmt.Errorf("no id provided")
 	}
+	return strings.Split(path[1:], "/")[2], nil
 }
 
-func SeviceHandler(w http.ResponseWriter, r *http.Request, id, method string, action chan<- Action) {
-	respCh := make(chan Response)
-	act := Action{
-		Id:      id,
-		Type:    method,
-		RetChan: respCh,
-	}
+func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
-	if method == "POST" {
-		var payload reqPayload
-		body, _ := ioutil.ReadAll(r.Body)
-		defer r.Body.Close()
-
-		if err := json.Unmarshal(body, &payload); err != nil {
-			fmt.Println("Error on POST request")
+	switch req.Method {
+	case http.MethodGet:
+		id, err := extractId(req.URL.Path)
+		if err != nil {
 			return
 		}
-
-		act.Payload = payload
-	}
-	action <- act
-	var resp Response
-	if resp = <-respCh; resp.StatusCode > http.StatusCreated {
-		writeError(w, resp.StatusCode)
-		return
-	}
-
-	writeResponse(w, resp)
-}
-
-func writeResponse(w http.ResponseWriter, resp Response) {
-	_, err := json.Marshal(resp.QrData)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError)
-		fmt.Println("Error while serializing payload:", err)
-	} else {
-		w.Header().Set("Content-Type", "image/png")
-		w.Header().Set("Content-Length", strconv.Itoa(len(resp.QrData)))
-		w.WriteHeader(resp.StatusCode)
-		w.Write(resp.QrData)
+		resp, err := s.Repo.GetQrCode(id)
+		if err != nil {
+			WriteError(rw, http.StatusInternalServerError)
+		}
+		WriteResponse(rw, resp)
+	case http.MethodPost:
+		payload, err := getPayload(req)
+		if err != nil {
+			return
+		}
+		resp, err := s.Repo.CreateQrCode(payload)
+		if err != nil {
+			WriteError(rw, http.StatusInternalServerError)
+		}
+		WriteResponse(rw, resp)
 	}
 }
 
-func writeError(w http.ResponseWriter, statusCode int) {
+func getPayload(req *http.Request) (string, error) {
+	var payload rPayload
+	body, _ := ioutil.ReadAll(req.Body)
+	defer req.Body.Close()
+
+	if err := json.Unmarshal(body, &payload); err != nil {
+		fmt.Println("Error on POST request")
+		return "", err
+	}
+	return payload.Text, nil
+}
+
+func WriteError(w http.ResponseWriter, statusCode int) {
 	jsonMsg := struct {
 		Msg  string `json:"msg"`
 		Code int    `json:"code"`
@@ -114,5 +105,18 @@ func writeError(w http.ResponseWriter, statusCode int) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(statusCode)
 		w.Write(serializedPayload)
+	}
+}
+
+func WriteResponse(w http.ResponseWriter, resp *Response) {
+	_, err := json.Marshal(resp.Data)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError)
+		fmt.Println("Error while serializing payload:", err)
+	} else {
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Content-Length", strconv.Itoa(len(resp.Data)))
+		w.WriteHeader(resp.StatusCode)
+		w.Write(resp.Data)
 	}
 }
