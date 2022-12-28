@@ -20,7 +20,7 @@ func main() {
 	}
 	qrCodesData := make(map[string][]byte)
 
-	// initialized database
+	// initialized kv data store
 	db, err := badger.Open(badger.DefaultOptions("/tmp/Badger"))
 	if err != nil {
 		log.Fatal(err)
@@ -31,18 +31,12 @@ func main() {
 
 	srv := service.NewService(store)
 
-	actionCh := make(chan service.Action)      // actions channel
-	qrCodes := make(map[string]service.QRCode) // used to mock data storage.
-
-	go srv.ServiceManager(qrCodes, actionCh)
-	qrCodeHandlers := MakeHandlers(service.SeviceHandler, "/api/qrcode/", actionCh)
-
-	if err := initServer(cfg, qrCodeHandlers); err != nil {
+	if err := initServer(cfg, srv); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
 
-func initServer(cfg Config, handlers http.HandlerFunc) error {
+func initServer(cfg Config, handlers http.Handler) error {
 	log.Printf("Starting qrcode-server on %s...", cfg.Addr)
 
 	server := http.Server{
@@ -51,22 +45,4 @@ func initServer(cfg Config, handlers http.HandlerFunc) error {
 	}
 
 	return server.ListenAndServe()
-}
-
-// Creates a generic handler for qr-code server
-func MakeHandlers(
-	fn func(http.ResponseWriter, *http.Request, string, string, chan<- service.Action),
-	endpoint string,
-	actionCh chan<- service.Action,
-) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		method := r.Method
-
-		log.Printf("Recieved request [%s] for path: [%s]", method, path)
-		id := path[len(endpoint):]
-
-		fn(w, r, id, method, actionCh)
-	}
-
 }
