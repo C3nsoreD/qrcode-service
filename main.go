@@ -18,7 +18,7 @@ const localStore = ".store"
 
 func main() {
 	cfg := Config{
-		Addr: "127.0.0.1:8080",
+		Addr: "127.0.0.1:3000",
 	}
 	qrCodesData := make(map[string][]byte)
 
@@ -41,10 +41,9 @@ func main() {
 func initServer(cfg Config, handlers http.Handler) error {
 	log.Printf("Starting qrcode-server on %s...", cfg.Addr)
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
 		fmt.Fprintf(rw, "Welcome to home page")
 	})
-	mux.Handle("/api/qrcode", handlers)
+	mux.Handle("/api/qrcode/", handlers)
 	return http.ListenAndServe(cfg.Addr, mux)
 }
