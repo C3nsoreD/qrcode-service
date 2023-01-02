@@ -1,9 +1,11 @@
 package main
 
 import (
-	badger "github.com/dgraph-io/badger/v3"
+	"fmt"
 	"log"
 	"net/http"
+
+	badger "github.com/dgraph-io/badger/v3"
 
 	"github.com/c3nsored/qrcode-service/service"
 )
@@ -29,20 +31,20 @@ func main() {
 
 	store := service.NewStore(db, qrCodesData)
 
-	srv := service.NewService(store)
+	apiHandler := service.NewService(store)
 
-	if err := initServer(cfg, srv); err != nil {
+	if err := initServer(cfg, apiHandler); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
 
 func initServer(cfg Config, handlers http.Handler) error {
 	log.Printf("Starting qrcode-server on %s...", cfg.Addr)
+	mux := http.NewServeMux()
 
-	server := http.Server{
-		Addr:    cfg.Addr,
-		Handler: handlers,
-	}
-
-	return server.ListenAndServe()
+	mux.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
+		fmt.Fprintf(rw, "Welcome to home page")
+	})
+	mux.Handle("/api/qrcode", handlers)
+	return http.ListenAndServe(cfg.Addr, mux)
 }

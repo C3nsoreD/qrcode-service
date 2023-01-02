@@ -45,20 +45,13 @@ type Action struct {
 	RetChan chan<- Response
 }
 
-func extractId(path string) (string, error) {
-	if len(path) < 2 {
-		return "", fmt.Errorf("no id provided")
-	}
-	return strings.Split(path[1:], "/")[2], nil
-}
-
+// path: api/qrcode
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-
 	switch req.Method {
 	case http.MethodGet:
 		id, err := extractId(req.URL.Path)
 		if err != nil {
-			return
+			WriteError(rw, http.StatusInternalServerError)
 		}
 		resp, err := s.Repo.GetQrCode(id)
 		if err != nil {
@@ -119,4 +112,11 @@ func WriteResponse(w http.ResponseWriter, resp *Response) {
 		w.WriteHeader(resp.StatusCode)
 		w.Write(resp.Data)
 	}
+}
+
+func extractId(path string) (string, error) {
+	if len(path) < 11 {
+		return "", fmt.Errorf("no id provided")
+	}
+	return strings.Split(path[1:], "/")[2], nil
 }
