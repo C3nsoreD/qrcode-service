@@ -114,6 +114,7 @@ func WriteResponse(w http.ResponseWriter, resp *Response) {
 	}
 }
 
+// extract id from all links to api/qrcode/...
 func extractId(path string) (string, error) {
 	if len(path) < 11 {
 		return "", fmt.Errorf("no id provided")
