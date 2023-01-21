@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,8 +16,8 @@ type Server struct {
 
 // QRCodeStore implements API calls to kv store
 type qrCodeStore interface {
-	GetQrCode(id string) (*Response, error)
-	CreateQrCode(payload string) (*Response, error)
+	GetQrCode(ctx context.Context, id string) (*Response, error)
+	CreateQrCode(ctx context.Context, url string) (*Response, error)
 }
 
 func NewService(repo qrCodeStore) *Server {
@@ -47,6 +48,8 @@ type Action struct {
 
 // path: api/qrcode
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+
 	switch req.Method {
 	case http.MethodGet:
 		id, err := extractId(req.URL.Path)
@@ -54,7 +57,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 			WriteError(rw, http.StatusInternalServerError, err)
 			break
 		}
-		resp, err := s.Repo.GetQrCode(id)
+		resp, err := s.Repo.GetQrCode(ctx, id)
 		if err != nil {
 			WriteError(rw, http.StatusInternalServerError, err)
 		}
@@ -64,7 +67,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			return
 		}
-		resp, err := s.Repo.CreateQrCode(payload)
+		resp, err := s.Repo.CreateQrCode(ctx, payload)
 		if err != nil {
 			WriteError(rw, http.StatusInternalServerError, err)
 		}
