@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,8 +16,8 @@ type Server struct {
 
 // QRCodeStore implements API calls to kv store
 type qrCodeStore interface {
-	GetQrCode(id string) (*Response, error)
-	CreateQrCode(payload string) (*Response, error)
+	GetQrCode(ctx context.Context, id string) (*Response, error)
+	CreateQrCode(ctx context.Context, url string) (*Response, error)
 }
 
 func NewService(repo qrCodeStore) *Server {
@@ -45,24 +46,20 @@ type Action struct {
 	RetChan chan<- Response
 }
 
-func extractId(path string) (string, error) {
-	if len(path) < 2 {
-		return "", fmt.Errorf("no id provided")
-	}
-	return strings.Split(path[1:], "/")[2], nil
-}
-
+// path: api/qrcode
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
 
 	switch req.Method {
 	case http.MethodGet:
 		id, err := extractId(req.URL.Path)
 		if err != nil {
-			return
+			WriteError(rw, http.StatusInternalServerError, err)
+			break
 		}
-		resp, err := s.Repo.GetQrCode(id)
+		resp, err := s.Repo.GetQrCode(ctx, id)
 		if err != nil {
-			WriteError(rw, http.StatusInternalServerError)
+			WriteError(rw, http.StatusInternalServerError, err)
 		}
 		WriteResponse(rw, resp)
 	case http.MethodPost:
@@ -70,9 +67,9 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			return
 		}
-		resp, err := s.Repo.CreateQrCode(payload)
+		resp, err := s.Repo.CreateQrCode(ctx, payload)
 		if err != nil {
-			WriteError(rw, http.StatusInternalServerError)
+			WriteError(rw, http.StatusInternalServerError, err)
 		}
 		WriteResponse(rw, resp)
 	}
@@ -90,13 +87,13 @@ func getPayload(req *http.Request) (string, error) {
 	return payload.Text, nil
 }
 
-func WriteError(w http.ResponseWriter, statusCode int) {
+func WriteError(w http.ResponseWriter, statusCode int, err error) {
 	jsonMsg := struct {
-		Msg  string `json:"msg"`
-		Code int    `json:"code"`
+		Msg   string `json:"msg"`
+		Error string `json:"error"`
 	}{
-		Code: statusCode,
-		Msg:  http.StatusText(statusCode),
+		Msg:   http.StatusText(statusCode),
+		Error: err.Error(),
 	}
 	if serializedPayload, err := json.Marshal(jsonMsg); err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -111,7 +108,7 @@ func WriteError(w http.ResponseWriter, statusCode int) {
 func WriteResponse(w http.ResponseWriter, resp *Response) {
 	_, err := json.Marshal(resp.Data)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError)
+		WriteError(w, http.StatusInternalServerError, err)
 		fmt.Println("Error while serializing payload:", err)
 	} else {
 		w.Header().Set("Content-Type", "image/png")
@@ -119,4 +116,13 @@ func WriteResponse(w http.ResponseWriter, resp *Response) {
 		w.WriteHeader(resp.StatusCode)
 		w.Write(resp.Data)
 	}
+}
+
+// extract id from all links to api/qrcode/...
+func extractId(path string) (string, error) {
+	id := strings.Split(path[1:], "/")[2]
+	if id == "" {
+		return "", fmt.Errorf("no id provided")
+	}
+	return id, nil
 }

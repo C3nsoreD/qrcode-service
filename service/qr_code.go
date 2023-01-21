@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/md5"
 	"fmt"
 
@@ -13,7 +14,7 @@ type QrCode struct {
 	url  string
 }
 
-func GenerateQrCode(url string) (*QrCode, error) {
+func GenerateQrCode(ctx context.Context, url string) (*QrCode, error) {
 	id := md5.Sum([]byte(url))
 
 	q, err := qrcode.New(url, qrcode.Medium)

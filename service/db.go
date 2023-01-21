@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -31,8 +32,8 @@ func NewStore(db *badger.DB, data map[string][]byte) *Store {
 	}
 }
 
-func (s *Store) CreateQrCode(payload string) (*Response, error) {
-	qr, err := GenerateQrCode(payload)
+func (s *Store) CreateQrCode(ctx context.Context, payload string) (*Response, error) {
+	qr, err := GenerateQrCode(ctx, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -52,10 +53,11 @@ func (s *Store) CreateQrCode(payload string) (*Response, error) {
 
 	return &Response{
 		StatusCode: http.StatusCreated,
+		Data:       png,
 	}, nil
 }
 
-func (s *Store) GetQrCode(id string) (*Response, error) {
+func (s *Store) GetQrCode(ctx context.Context, id string) (*Response, error) {
 	log.Printf("retrieving qr-code with id: %s\n", id)
 	var res *Response
 	if err := s.db.View(func(txn *badger.Txn) error {
