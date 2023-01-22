@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"github.com/pkg/errors"
 
 	"github.com/skip2/go-qrcode"
 )
@@ -18,9 +19,8 @@ func GenerateQrCode(ctx context.Context, url string) (*QrCode, error) {
 	id := md5.Sum([]byte(url))
 
 	q, err := qrcode.New(url, qrcode.Medium)
-
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to generate qrcode")
 	}
 
 	return &QrCode{

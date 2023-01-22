@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,14 +12,19 @@ import (
 )
 
 type Config struct {
-	Addr string
+	Addr string `envconfig:"PORT" default:"8080"`
 }
 
 const localStore = ".store"
 
+var (
+	//go:embed static/index.html
+	index string
+)
+
 func main() {
 	cfg := Config{
-		Addr: "127.0.0.1:3000",
+		Addr: "3000",
 	}
 	qrCodesData := make(map[string][]byte)
 
@@ -36,14 +42,15 @@ func main() {
 	if err := initServer(cfg, apiHandler); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+	fmt.Printf("starting server on %s", cfg.Addr)
 }
 
 func initServer(cfg Config, handlers http.Handler) error {
 	log.Printf("Starting qrcode-server on %s...", cfg.Addr)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
-		fmt.Fprintf(rw, "Welcome to home page")
+		fmt.Fprintf(rw, index)
 	})
 	mux.Handle("/api/qrcode/", handlers)
-	return http.ListenAndServe(cfg.Addr, mux)
+	return http.ListenAndServe("localhost:"+cfg.Addr, mux)
 }

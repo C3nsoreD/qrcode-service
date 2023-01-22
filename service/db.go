@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	badger "github.com/dgraph-io/badger/v3"
+	"github.com/pkg/errors"
 	"github.com/skip2/go-qrcode"
 )
 
@@ -35,12 +36,12 @@ func NewStore(db *badger.DB, data map[string][]byte) *Store {
 func (s *Store) CreateQrCode(ctx context.Context, payload string) (*Response, error) {
 	qr, err := GenerateQrCode(ctx, payload)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "store failed to create qrcode")
 	}
 
 	png, err := qr.Code.PNG(250)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "store failed to encode qrcode")
 	}
 
 	if err = s.storeResource(qr.Id, png); err != nil {
@@ -63,10 +64,12 @@ func (s *Store) GetQrCode(ctx context.Context, id string) (*Response, error) {
 	if err := s.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(id))
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "store failed to get qr-code: %s", id)
 		}
 		val, err := item.ValueCopy(nil)
-
+		if err != nil {
+			return errors.Wrapf(err, "store failed to get value")
+		}
 		res = &Response{
 			StatusCode: http.StatusOK,
 			Data:       val,
