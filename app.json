@@ -1,0 +1,10 @@
+{
+  "name": "QrCode serice: Menuizer",
+  "description": "Test development version 1",
+  "keywords": [
+    "qrcode",
+    "go"
+  ],
+  "website": "https://github.com/C3nsoreD/qrcode-service",
+  "repository": "https://github.com/C3nsoreD/qrcode-service"
+}

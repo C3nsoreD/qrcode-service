@@ -1,0 +1,6 @@
+build:
+  languages:
+  - go
+
+
+web: bin/qrcode-service
